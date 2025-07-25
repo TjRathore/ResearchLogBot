@@ -1,0 +1,146 @@
+Project Title:
+AI Research Logging Bot MVP for Telegram & Slack (7-Day Prototype)
+
+Goal:
+Build and deploy an MVP bot (in 7 days) that:
+
+Monitors Slack and Telegram group messages in real time
+
+Extracts problem–solution pairs with OpenAI/GPT
+
+Stores structured knowledge (with metadata + vector embeddings)
+
+Answers /ask and /search questions in chat using its internal KB, falling back to web search as needed
+
+Supports validation/flagging and a lightweight admin review UI
+
+1. Tech Stack
+Backend: Python (FastAPI recommended), PostgreSQL (use Supabase or direct Replit PostgreSQL plugin), pgvector for embeddings
+
+Orchestration / Automation: If possible, integrate n8n cloud OR replicate core flows with Python scripts/async jobs
+
+AI Integration: OpenAI GPT-4o (chat/extraction), OpenAI text-embedding-ada-002 (vector embeddings)
+
+APIs: Telegram Bot API, Slack Bot Events/Web API, Supabase REST API
+
+Deployment: Replit web app + background tasks
+
+Frontend (optional for review UI): Minimal React or Flask, or use Supabase dashboard
+
+2. Step-by-Step MVP Features & Tasks
+A. Day 1: Project & Accounts Setup
+
+Scaffold FastAPI app in main.py
+
+Connect to Replit PostgreSQL or external Supabase DB (schema below)
+
+Set up .env for API keys: OpenAI, Telegram, Slack, Supabase
+
+Create initial GitHub repo (if collaborating)
+
+B. Day 2: Data Model & Messaging Integration
+
+Implement the tables (see SQL below)
+
+Set up Telegram + Slack webhook endpoints (FastAPI routes)
+
+Store all incoming messages
+
+C. Day 3: OpenAI Extraction Pipeline
+
+Write a function to call GPT-4o and extract {problem, solution} JSON from messages
+
+Calculate embedding with text-embedding-ada-002; store in DB
+
+D. Day 4: Semantic Search & Q&A
+
+Create API route (/search) that retrieves top results from knowledge_pairs using pgvector cosine similarity
+
+Add fallback keyword search
+
+E. Day 5: Bot Chat Commands
+
+Add handlers for /ask, /search, /help
+
+Connect bot replies to DB searches and format Markdown answers
+
+Only reply when directly mentioned or via command
+
+F. Day 6: Validation and Admin UI
+
+Enable /flag command to mark validated=false
+
+Optional: Minimal web page to browse/edit flagged/validated pairs (Flask/React or just use Supabase web dashboard)
+
+Log and display audit history of edits/flags
+
+G. Day 7: Testing, Polish & Demo
+
+Seed with sample chat for demo
+
+Write README and user guide
+
+Record a usage demo (Loom/Screen recording)
+
+3. Data Model ([SQL Schema])
+sql
+CREATE TABLE messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  platform TEXT NOT NULL, -- 'slack' or 'telegram'
+  channel_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  timestamp TIMESTAMP DEFAULT NOW(),
+  processed BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE knowledge_pairs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  problem TEXT NOT NULL,
+  solution TEXT NOT NULL,
+  source_message_id UUID REFERENCES messages(id) ON DELETE CASCADE,
+  confidence_score FLOAT DEFAULT 0.0,
+  embedding VECTOR(1536),
+  validated BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+4. Example OpenAI Prompt
+For extraction (in Python dictionary or JSON response):
+
+text
+You are an R&D group scribe. Given the following chat message, extract exactly one problem and a corresponding solution, if present. Return JSON:
+{ "problem": "...", "solution": "..." }
+Message: "Hey team, we kept getting a timeout error on the new workflow last night. Switching to async fixed it."
+5. Success Criteria
+Working demo answering at least 10 test /ask queries in chat
+
+Extraction accuracy above 70% for test messages
+
+Internal knowledge base with at least 20 problem–solution pairs stored
+
+Simple feedback and flagging workflow (manual review okay for MVP)
+
+All major tasks (above) reproducible/deployable via README on Replit
+
+6. Deployment Instructions
+Ensure bots/webhooks are registered and point to your Replit web app's endpoints (use Replit's "webview" feature for admin if needed)
+
+Connect all API keys as .env secrets
+
+Use UptimeRobot or similar to keep the Replit instance alive
+
+7. Reference Architecture Diagram
+Message Input (Telegram/Slack APIs)
+
+FastAPI endpoints ingest to DB
+
+Extraction pipeline (OpenAI GPT-4o, then embedding)
+
+Knowledge storage (Postgres + pgvector)
+
+Search API (semantic + keyword)
+
+Bot output to Telegram/Slack
+
+Admin UI (optional/minimal at MVP)
