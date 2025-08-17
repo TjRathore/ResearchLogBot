@@ -6,6 +6,8 @@ import { sendTelegramMessage, parseTelegramUpdate, type TelegramUpdate } from ".
 import { sendSlackMessage, parseSlackEvent, type SlackEvent } from "./services/slack";
 import { generateEmbedding, generateAnswer } from "./services/openai";
 import { insertMessageSchema, insertKnowledgePairSchema } from "@shared/schema";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Start periodic extraction processing
@@ -188,6 +190,240 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Failed to get messages:', error);
       res.status(500).json({ error: 'Failed to get messages' });
+    }
+  });
+
+  // n8n Integration Routes
+  app.get("/api/n8n/knowledge-pairs", async (req, res) => {
+    try {
+      const { limit = 100, offset = 0, validated, since } = req.query;
+      
+      let whereClause = "";
+      const params: any[] = [];
+      
+      if (validated !== undefined) {
+        whereClause += " WHERE validated = $" + (params.length + 1);
+        params.push(validated === "true");
+      }
+      
+      if (since) {
+        const connector = whereClause ? " AND" : " WHERE";
+        whereClause += connector + " created_at >= $" + (params.length + 1);
+        params.push(new Date(since as string));
+      }
+      
+      params.push(Number(limit), Number(offset));
+      
+      const query = `
+        SELECT 
+          id,
+          problem,
+          solution,
+          confidence_score,
+          validated,
+          created_at,
+          updated_at
+        FROM knowledge_pairs
+        ${whereClause}
+        ORDER BY created_at DESC
+        LIMIT $${params.length - 1} OFFSET $${params.length}
+      `;
+      
+      const result = await db.execute(sql.raw(query, params));
+      const resultData = result.rows || result;
+      
+      // Also return metadata for pagination
+      const countQuery = `SELECT COUNT(*) as total FROM knowledge_pairs ${whereClause}`;
+      const countResult = await db.execute(sql.raw(countQuery, params.slice(0, -2)));
+      const countData = countResult.rows || countResult;
+      const total = Number(countData[0].total);
+      
+      res.json({
+        data: resultData,
+        metadata: {
+          total,
+          limit: Number(limit),
+          offset: Number(offset),
+          hasMore: Number(offset) + Number(limit) < total
+        }
+      });
+    } catch (error) {
+      console.error("Failed to get knowledge pairs for n8n:", error);
+      res.status(500).json({ error: "Failed to get knowledge pairs" });
+    }
+  });
+
+  app.post("/api/n8n/knowledge-pairs", async (req, res) => {
+    try {
+      const { problem, solution, confidence_score = 0.8, validated = false } = req.body;
+      
+      if (!problem || !solution) {
+        return res.status(400).json({ error: "Problem and solution are required" });
+      }
+      
+      // Generate embedding for the new knowledge pair
+      const { generateEmbedding } = await import("./services/openai.js");
+      const embedding = await generateEmbedding(`${problem} ${solution}`);
+      
+      const result = await storage.createKnowledgePair({
+        problem,
+        solution,
+        confidenceScore: Number(confidence_score),
+        embedding,
+        validated: Boolean(validated)
+      });
+      
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Failed to create knowledge pair via n8n:", error);
+      res.status(500).json({ error: "Failed to create knowledge pair" });
+    }
+  });
+
+  app.put("/api/n8n/knowledge-pairs/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { problem, solution, confidence_score, validated } = req.body;
+      
+      const updates: any = {};
+      if (problem !== undefined) updates.problem = problem;
+      if (solution !== undefined) updates.solution = solution;
+      if (confidence_score !== undefined) updates.confidenceScore = Number(confidence_score);
+      if (validated !== undefined) updates.validated = Boolean(validated);
+      
+      // If problem or solution changed, regenerate embedding
+      if (problem || solution) {
+        const currentPair = await storage.getKnowledgePairById(id);
+        if (currentPair) {
+          const newProblem = problem || currentPair.problem;
+          const newSolution = solution || currentPair.solution;
+          updates.embedding = await generateEmbedding(`${newProblem} ${newSolution}`);
+        }
+      }
+      
+      const result = await storage.updateKnowledgePair(id, updates);
+      if (!result) {
+        return res.status(404).json({ error: "Knowledge pair not found" });
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to update knowledge pair via n8n:", error);
+      res.status(500).json({ error: "Failed to update knowledge pair" });
+    }
+  });
+
+  app.post("/api/n8n/webhook/register", async (req, res) => {
+    try {
+      const { webhook_url, events = ['created', 'updated', 'validated'] } = req.body;
+      
+      if (!webhook_url) {
+        return res.status(400).json({ error: "webhook_url is required" });
+      }
+      
+      // Store webhook configuration (in production, store this in database)
+      res.json({ 
+        message: "Webhook registered successfully",
+        webhook_url,
+        events,
+        endpoints: {
+          knowledge_pairs: "/api/n8n/knowledge-pairs",
+          messages: "/api/n8n/messages",
+          search: "/api/n8n/search"
+        }
+      });
+    } catch (error) {
+      console.error("Failed to register webhook:", error);
+      res.status(500).json({ error: "Failed to register webhook" });
+    }
+  });
+
+  app.get("/api/n8n/messages", async (req, res) => {
+    try {
+      const { limit = 100, offset = 0, platform, processed, since } = req.query;
+      
+      let whereClause = "";
+      const params: any[] = [];
+      
+      if (platform) {
+        whereClause += " WHERE platform = $" + (params.length + 1);
+        params.push(platform);
+      }
+      
+      if (processed !== undefined) {
+        const connector = whereClause ? " AND" : " WHERE";
+        whereClause += connector + " processed = $" + (params.length + 1);
+        params.push(processed === "true");
+      }
+      
+      if (since) {
+        const connector = whereClause ? " AND" : " WHERE";
+        whereClause += connector + " timestamp >= $" + (params.length + 1);
+        params.push(new Date(since as string));
+      }
+      
+      params.push(Number(limit), Number(offset));
+      
+      const query = `
+        SELECT 
+          id,
+          platform,
+          channel_id,
+          user_id,
+          content,
+          processed,
+          timestamp
+        FROM messages
+        ${whereClause}
+        ORDER BY timestamp DESC
+        LIMIT $${params.length - 1} OFFSET $${params.length}
+      `;
+      
+      const result = await db.execute(sql.raw(query, params));
+      const resultData = result.rows || result;
+      
+      const countQuery = `SELECT COUNT(*) as total FROM messages ${whereClause}`;
+      const countResult = await db.execute(sql.raw(countQuery, params.slice(0, -2)));
+      const countData = countResult.rows || countResult;
+      const total = Number(countData[0].total);
+      
+      res.json({
+        data: resultData,
+        metadata: {
+          total,
+          limit: Number(limit),
+          offset: Number(offset),
+          hasMore: Number(offset) + Number(limit) < total
+        }
+      });
+    } catch (error) {
+      console.error("Failed to get messages for n8n:", error);
+      res.status(500).json({ error: "Failed to get messages" });
+    }
+  });
+
+  app.post("/api/n8n/search", async (req, res) => {
+    try {
+      const { query, limit = 5, min_similarity = 0.3 } = req.body;
+      
+      if (!query) {
+        return res.status(400).json({ error: "Query is required" });
+      }
+      
+      const embedding = await generateEmbedding(query);
+      const results = await storage.searchKnowledgePairsByEmbedding(embedding, Number(limit));
+      
+      // Filter by minimum similarity
+      const filteredResults = results.filter(r => r.similarity >= Number(min_similarity));
+      
+      res.json({
+        query,
+        results: filteredResults,
+        total_found: filteredResults.length
+      });
+    } catch (error) {
+      console.error("Failed to search via n8n:", error);
+      res.status(500).json({ error: "Failed to search knowledge pairs" });
     }
   });
 

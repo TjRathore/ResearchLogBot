@@ -1,0 +1,180 @@
+{
+  "name": "AI Research Bot - Knowledge Sync Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "interval": 300,
+        "unit": "seconds"
+      },
+      "id": "schedule-trigger",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://your-research-bot-url/api/n8n/knowledge-pairs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "validated",
+                "value": "true"
+              },
+              {
+                "name": "limit", 
+                "value": "50"
+              },
+              {
+                "name": "since",
+                "value": "={{ $now.minus({minutes: 5}).toISO() }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "get-knowledge-pairs",
+      "name": "Get New Knowledge Pairs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "={{ $json.data.length }}",
+            "operation": "larger",
+            "rightValue": 0
+          }
+        }
+      },
+      "id": "check-new-data",
+      "name": "Has New Data?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform knowledge pairs for external system\nconst knowledgePairs = $input.first().json.data;\n\nreturn knowledgePairs.map(pair => ({\n  external_id: pair.id,\n  title: pair.problem,\n  content: pair.solution,\n  confidence: pair.confidence_score,\n  validated: pair.validated,\n  created_at: pair.created_at,\n  tags: ['ai-research-bot', 'knowledge-base']\n}));"
+      },
+      "id": "transform-data",
+      "name": "Transform for External System",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://your-external-system.com/api/knowledge",
+        "authentication": "genericCredentialType", 
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "knowledge_pairs",
+              "value": "={{ $json }}"
+            }
+          ]
+        }
+      },
+      "id": "sync-external",
+      "name": "Sync to External System",
+      "type": "n8n-nodes-base.httpRequest", 
+      "typeVersion": 4.1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "message": "=Synced {{ $('Get New Knowledge Pairs').item.json.data.length }} new knowledge pairs to external system",
+        "options": {}
+      },
+      "id": "slack-notification",
+      "name": "Send Slack Notification",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [1340, 200]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get New Knowledge Pairs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get New Knowledge Pairs": {
+      "main": [
+        [
+          {
+            "node": "Has New Data?",
+            "type": "main", 
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has New Data?": {
+      "main": [
+        [
+          {
+            "node": "Transform for External System",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform for External System": {
+      "main": [
+        [
+          {
+            "node": "Sync to External System",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sync to External System": {
+      "main": [
+        [
+          {
+            "node": "Send Slack Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["ai-research-bot", "knowledge-sync"],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}
