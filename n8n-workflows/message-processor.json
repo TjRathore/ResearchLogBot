@@ -1,0 +1,265 @@
+{
+  "name": "AI Research Bot - Message Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "message-received",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-message-received",
+      "name": "Message Received",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "process-message", 
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-process-message",
+      "name": "Process Message",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Store incoming message\nconst message = $input.first().json.data;\n\n// Add to message storage\nconst storage = $workflow.staticData || {};\nif (!storage.messages) storage.messages = [];\n\nstorage.messages.push(message);\n$workflow.staticData = storage;\n\nconsole.log(`Stored message from ${message.platform}: ${message.content.substring(0, 50)}...`);\n\nreturn [{\n  success: true,\n  id: message.id,\n  message: 'Message stored successfully'\n}];"
+      },
+      "id": "store-message",
+      "name": "Store Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract problem-solution pairs from message\nconst message = $input.first().json.message;\nconst content = message.content;\n\n// Simple extraction logic (you can enhance with AI/OpenAI here)\nlet problemSolution = null;\n\n// Look for Q&A patterns\nif (content.includes('?') && content.length > 20) {\n  // Potential question\n  const problem = content.trim();\n  problemSolution = {\n    problem: problem,\n    solution: '', // Will be filled by responses\n    confidence_score: 0.6,\n    validated: false,\n    source_platform: message.platform,\n    source_channel: message.channel_id\n  };\n}\n\n// Look for solution patterns (responses with helpful keywords)\nelse if (/\\b(use|try|install|configure|fix|solve|solution)\\b/i.test(content) && content.length > 30) {\n  // Potential solution - look for recent questions in context\n  const storage = $workflow.staticData || { messages: [] };\n  const recentMessages = storage.messages.slice(-10); // Last 10 messages\n  \n  // Find recent question from same channel\n  const recentQuestion = recentMessages.reverse().find(msg => \n    msg.channel_id === message.channel_id && \n    msg.content.includes('?') && \n    new Date(message.timestamp) - new Date(msg.timestamp) < 3600000 // Within 1 hour\n  );\n  \n  if (recentQuestion) {\n    problemSolution = {\n      problem: recentQuestion.content.trim(),\n      solution: content.trim(),\n      confidence_score: 0.8,\n      validated: false,\n      source_platform: message.platform,\n      source_channel: message.channel_id\n    };\n  }\n}\n\nif (problemSolution) {\n  return [problemSolution];\n} else {\n  return [{ no_extraction: true, reason: 'No problem-solution pattern found' }];\n}"
+      },
+      "id": "extract-knowledge",
+      "name": "Extract Knowledge",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "={{ $json.no_extraction }}",
+            "operation": "notEqual",
+            "rightValue": true
+          }
+        }
+      },
+      "id": "has-knowledge",
+      "name": "Has Knowledge?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 500]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:5000/webhook/knowledge-pair-created",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "create"
+            },
+            {
+              "name": "data",
+              "value": "={{ $json }}"
+            }
+          ]
+        }
+      },
+      "id": "create-knowledge-pair",
+      "name": "Create Knowledge Pair",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "={{ $json.confidence_score }}",
+            "operation": "largerEqual",
+            "rightValue": 0.8
+          }
+        }
+      },
+      "id": "high-confidence",
+      "name": "High Confidence?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "channel": "#ai-research-bot",
+        "text": "🧠 New high-confidence knowledge pair extracted:\\n\\n*Problem:* {{ $json.problem }}\\n*Solution:* {{ $json.solution }}\\n*Confidence:* {{ $json.confidence_score }}\\n*Platform:* {{ $json.source_platform }}",
+        "otherOptions": {}
+      },
+      "id": "notify-high-confidence",
+      "name": "Notify High Confidence",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "channel": "#ai-research-bot-review",
+        "text": "❓ New knowledge pair needs review:\\n\\n*Problem:* {{ $json.problem }}\\n*Solution:* {{ $json.solution }}\\n*Confidence:* {{ $json.confidence_score }}\\n*Platform:* {{ $json.source_platform }}\\n\\nReact with ✅ to approve or ❌ to reject",
+        "otherOptions": {}
+      },
+      "id": "notify-needs-review",
+      "name": "Notify Needs Review",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [1340, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"success\": true, \"stored\": true }"
+      },
+      "id": "respond-stored",
+      "name": "Respond Stored",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"success\": true, \"extracted\": {{ !$json.no_extraction }} }"
+      },
+      "id": "respond-processed",
+      "name": "Respond Processed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 600]
+    }
+  ],
+  "connections": {
+    "Message Received": {
+      "main": [
+        [
+          {
+            "node": "Store Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Message": {
+      "main": [
+        [
+          {
+            "node": "Extract Knowledge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Message": {
+      "main": [
+        [
+          {
+            "node": "Respond Stored",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Knowledge": {
+      "main": [
+        [
+          {
+            "node": "Has Knowledge?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Knowledge?": {
+      "main": [
+        [
+          {
+            "node": "Create Knowledge Pair",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Knowledge Pair": {
+      "main": [
+        [
+          {
+            "node": "High Confidence?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Confidence?": {
+      "main": [
+        [
+          {
+            "node": "Notify High Confidence",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Needs Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "messages": []
+  },
+  "tags": ["ai-research-bot", "message-processing"],
+  "triggerCount": 2,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

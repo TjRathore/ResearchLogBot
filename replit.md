@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a full-stack AI Research Bot application built for monitoring Slack and Telegram messages, extracting problem-solution pairs using OpenAI, and providing intelligent responses through a knowledge base system. The application features a React-based admin dashboard for managing extracted knowledge pairs and monitoring bot activities.
+This is a full-stack AI Research Bot application that uses n8n as the primary data store and workflow engine instead of traditional databases. The bot monitors Slack and Telegram messages, extracts problem-solution pairs through n8n workflows, and provides intelligent responses through a visual workflow-based knowledge management system. The application features a React-based admin dashboard for managing extracted knowledge pairs and monitoring bot activities.
 
 ## User Preferences
 
@@ -29,18 +29,18 @@ The application follows a modern full-stack architecture with clear separation b
 
 ## Key Components
 
-### Database Schema
-The application uses three main database tables:
-- **messages**: Stores incoming messages from Slack and Telegram with processing status
-- **knowledge_pairs**: Stores extracted problem-solution pairs with embeddings and validation status
-- **users**: Basic user management for admin access
+### n8n Workflow Data Management
+The application uses n8n workflows for data storage and processing:
+- **Knowledge Base Manager**: Stores and retrieves problem-solution pairs with filtering and search capabilities
+- **Message Processor**: Handles incoming messages and extracts knowledge pairs automatically
+- **Webhook Integration**: Real-time data synchronization between the bot and n8n workflows
 
 ### Core Services
-- **Extraction Service**: Processes unprocessed messages to extract problem-solution pairs using OpenAI
-- **OpenAI Service**: Handles GPT-4o interactions for text extraction and embedding generation
+- **n8n Service**: Manages communication with n8n workflows for data operations and automation
+- **n8n Storage**: Provides storage abstraction layer using n8n webhooks instead of database
+- **OpenAI Service** (Optional): Enhanced text processing and embedding generation when API key is provided
 - **Telegram Service**: Manages Telegram bot webhook integration and message handling
 - **Slack Service**: Handles Slack Events API integration and message processing
-- **Storage Layer**: Provides abstraction over database operations with Drizzle ORM
 
 ### Admin Dashboard Pages
 - **Dashboard**: Overview with statistics and quick search functionality
@@ -52,11 +52,11 @@ The application uses three main database tables:
 ## Data Flow
 
 1. **Message Ingestion**: Webhooks receive messages from Slack and Telegram platforms
-2. **Storage**: Messages are stored in the database with unprocessed status
-3. **Processing**: Background service extracts problem-solution pairs using OpenAI
-4. **Embedding Generation**: Text embeddings are created for vector similarity search
-5. **Knowledge Base**: Validated pairs become searchable through the admin interface
-6. **Bot Responses**: Commands trigger searches against the knowledge base to provide answers
+2. **n8n Storage**: Messages are sent to n8n workflows via webhooks for storage and processing
+3. **Automated Processing**: n8n workflows automatically extract problem-solution pairs using pattern matching
+4. **Validation Workflows**: High-confidence pairs auto-validated, others queued for human review
+5. **Knowledge Base**: Validated pairs stored in n8n workflow static data, searchable through the admin interface
+6. **Bot Responses**: Commands trigger n8n search workflows to provide intelligent answers
 
 ## External Dependencies
 
@@ -80,19 +80,20 @@ The application is designed for deployment on Replit with the following consider
 ### Build Process
 - **Development**: Uses tsx for TypeScript execution with hot reloading
 - **Production**: Vite builds the frontend, esbuild bundles the backend
-- **Database**: Drizzle migrations handle schema updates
+- **n8n Workflows**: Import provided workflow JSON files for data management
 
 ### Architecture Decisions
 - **Monorepo Structure**: Frontend (`client/`), backend (`server/`), and shared code (`shared/`) in single repository
 - **Type Safety**: Full TypeScript implementation with shared schema definitions
-- **Real-time Processing**: Background service for message processing to avoid blocking webhook responses
-- **Scalable Storage**: Vector embeddings for efficient similarity search in knowledge base
+- **Visual Workflows**: n8n provides visual workflow management for easy customization
+- **Real-time Processing**: n8n handles concurrent webhook processing without blocking responses
+- **Flexible Data**: n8n static data storage with easy backup and migration capabilities
 - **Modular Design**: Service-based architecture for easy testing and maintenance
 
 ### Performance Considerations
-- **Connection Pooling**: Neon serverless connections with WebSocket support
-- **Efficient Queries**: Drizzle ORM with optimized database operations
-- **Background Processing**: Non-blocking message processing to maintain webhook responsiveness
-- **Vector Search**: PostgreSQL with pgvector extension for fast similarity searches
+- **Webhook Processing**: n8n handles multiple concurrent webhook requests efficiently
+- **Visual Monitoring**: n8n provides execution logs and workflow monitoring out of the box
+- **Easy Scaling**: Add new processing steps through visual workflow editor
+- **Text-based Search**: Simple similarity search implemented in JavaScript within workflows
 
 The system prioritizes reliability and maintainability while providing a responsive user experience for both bot interactions and admin management tasks.

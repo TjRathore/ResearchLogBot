@@ -1,17 +1,15 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { extractionService } from "./services/extraction";
+import { n8nStorage as storage } from "./storage/n8n-storage";
+// import { extractionService } from "./services/extraction"; // Not needed with n8n integration
 import { sendTelegramMessage, parseTelegramUpdate, type TelegramUpdate } from "./services/telegram";
 import { sendSlackMessage, parseSlackEvent, type SlackEvent } from "./services/slack";
 import { generateEmbedding, generateAnswer } from "./services/openai";
 import { insertMessageSchema, insertKnowledgePairSchema } from "@shared/schema";
-import { db } from "./db";
-import { sql } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Start periodic extraction processing
-  extractionService.startPeriodicProcessing();
+  // Start periodic extraction processing - handled by n8n workflows
+  // extractionService.startPeriodicProcessing();
 
   // Telegram webhook endpoint
   app.post("/api/telegram/webhook", async (req, res) => {

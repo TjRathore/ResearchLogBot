@@ -1,0 +1,186 @@
+{
+  "name": "AI Research Bot - Knowledge Base Manager",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "knowledge-pair-created",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-knowledge-created",
+      "name": "Knowledge Pair Created",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST", 
+        "path": "get-knowledge-pairs",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-get-knowledge",
+      "name": "Get Knowledge Pairs",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 500]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "search-knowledge-pairs", 
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-search-knowledge",
+      "name": "Search Knowledge Pairs",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 700]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Store knowledge pair in memory or external database\nconst knowledgePair = $input.first().json.data;\n\n// Add to global storage (you can replace this with actual database operations)\nconst storage = $workflow.staticData || {};\nif (!storage.knowledgePairs) storage.knowledgePairs = [];\n\n// Add the new knowledge pair\nstorage.knowledgePairs.push(knowledgePair);\n$workflow.staticData = storage;\n\n// Log the action\nconsole.log(`Created knowledge pair: ${knowledgePair.problem}`);\n\nreturn [{\n  success: true,\n  id: knowledgePair.id,\n  message: 'Knowledge pair created successfully'\n}];"
+      },
+      "id": "store-knowledge-pair",
+      "name": "Store Knowledge Pair",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Retrieve knowledge pairs from storage\nconst params = $input.first().json;\nconst storage = $workflow.staticData || { knowledgePairs: [] };\n\nlet knowledgePairs = storage.knowledgePairs || [];\n\n// Apply filters\nif (params.validated !== undefined) {\n  knowledgePairs = knowledgePairs.filter(pair => pair.validated === params.validated);\n}\n\nif (params.since) {\n  const sinceDate = new Date(params.since);\n  knowledgePairs = knowledgePairs.filter(pair => new Date(pair.created_at) >= sinceDate);\n}\n\n// Apply pagination\nconst limit = params.limit || 100;\nconst offset = params.offset || 0;\nconst paginatedPairs = knowledgePairs.slice(offset, offset + limit);\n\nreturn [{\n  knowledge_pairs: paginatedPairs,\n  total: knowledgePairs.length,\n  limit: limit,\n  offset: offset\n}];"
+      },
+      "id": "retrieve-knowledge-pairs",
+      "name": "Retrieve Knowledge Pairs", 
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Search knowledge pairs\nconst { query, limit = 5, min_similarity = 0.3 } = $input.first().json;\nconst storage = $workflow.staticData || { knowledgePairs: [] };\nconst knowledgePairs = storage.knowledgePairs || [];\n\n// Simple text-based search (you can enhance with vector similarity)\nconst searchTerms = query.toLowerCase().split(' ');\nconst results = [];\n\nfor (const pair of knowledgePairs) {\n  const problemText = pair.problem.toLowerCase();\n  const solutionText = pair.solution.toLowerCase();\n  const combinedText = `${problemText} ${solutionText}`;\n  \n  // Calculate simple relevance score\n  let score = 0;\n  for (const term of searchTerms) {\n    if (combinedText.includes(term)) {\n      score += 1;\n    }\n  }\n  \n  const similarity = score / searchTerms.length;\n  \n  if (similarity >= min_similarity) {\n    results.push({\n      ...pair,\n      similarity: similarity\n    });\n  }\n}\n\n// Sort by similarity and limit results\nresults.sort((a, b) => b.similarity - a.similarity);\nconst limitedResults = results.slice(0, limit);\n\nreturn [{\n  results: limitedResults,\n  total_found: limitedResults.length\n}];"
+      },
+      "id": "search-knowledge-pairs",
+      "name": "Search Knowledge Pairs",
+      "type": "n8n-nodes-base.code", 
+      "typeVersion": 2,
+      "position": [460, 700]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond-created",
+      "name": "Respond Created",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond-retrieved",
+      "name": "Respond Retrieved", 
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond-searched",
+      "name": "Respond Searched",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 700]
+    }
+  ],
+  "connections": {
+    "Knowledge Pair Created": {
+      "main": [
+        [
+          {
+            "node": "Store Knowledge Pair",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Knowledge Pairs": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Knowledge Pairs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Knowledge Pairs": {
+      "main": [
+        [
+          {
+            "node": "Search Knowledge Pairs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Knowledge Pair": {
+      "main": [
+        [
+          {
+            "node": "Respond Created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Knowledge Pairs": {
+      "main": [
+        [
+          {
+            "node": "Respond Retrieved", 
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Knowledge Pairs": {
+      "main": [
+        [
+          {
+            "node": "Respond Searched",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "knowledgePairs": []
+  },
+  "tags": ["ai-research-bot", "knowledge-management"],
+  "triggerCount": 3,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}
