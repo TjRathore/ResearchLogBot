@@ -7,7 +7,6 @@ export default function Sidebar() {
   const navItems = [
     { href: "/", label: "Overview", icon: BarChart3 },
     { href: "/knowledge-pairs", label: "Knowledge Pairs", icon: Brain },
-    { href: "/quality", label: "Quality Dashboard", icon: BarChart3 },
     { href: "/messages", label: "Messages", icon: MessageSquare },
     { href: "/search", label: "Search & Query", icon: Search },
     { href: "/settings", label: "Bot Settings", icon: Settings },

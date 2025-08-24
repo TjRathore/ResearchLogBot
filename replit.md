@@ -38,15 +38,13 @@ The application uses n8n workflows for data storage and processing:
 ### Core Services
 - **n8n Service**: Manages communication with n8n workflows for data operations and automation
 - **n8n Storage**: Provides storage abstraction layer using n8n webhooks instead of database
-- **Quality Scorer Service**: Automated confidence scoring and quality metrics using AI analysis and heuristic algorithms
 - **OpenAI Service** (Optional): Enhanced text processing and embedding generation when API key is provided
 - **Telegram Service**: Manages Telegram bot webhook integration and message handling
 - **Slack Service**: Handles Slack Events API integration and message processing
 
 ### Admin Dashboard Pages
 - **Dashboard**: Overview with statistics and quick search functionality
-- **Knowledge Pairs**: Stack Overflow-style interface with upvoting/downvoting and related queries
-- **Quality Dashboard**: Comprehensive quality metrics, batch processing, and automated scoring
+- **Knowledge Pairs**: Management interface for reviewing and validating extracted pairs
 - **Messages**: Monitor incoming messages from both platforms
 - **Search**: Test the knowledge base search functionality
 - **Settings**: Bot configuration and connection status
@@ -56,11 +54,9 @@ The application uses n8n workflows for data storage and processing:
 1. **Message Ingestion**: Webhooks receive messages from Slack and Telegram platforms
 2. **n8n Storage**: Messages are sent to n8n workflows via webhooks for storage and processing
 3. **Automated Processing**: n8n workflows automatically extract problem-solution pairs using pattern matching
-4. **Quality Scoring**: Multi-layered quality assessment combining AI analysis, heuristic scoring, and community feedback
-5. **Auto-Validation**: High-quality pairs with confidence scores above 85% are automatically validated
-6. **Community Validation**: Stack Overflow-style voting system provides ongoing quality improvement
-7. **Knowledge Base**: Validated pairs stored with comprehensive quality metrics and related query relationships
-8. **Bot Responses**: Commands trigger intelligent search with quality-weighted results
+4. **Validation Workflows**: High-confidence pairs auto-validated, others queued for human review
+5. **Knowledge Base**: Validated pairs stored in n8n workflow static data, searchable through the admin interface
+6. **Bot Responses**: Commands trigger n8n search workflows to provide intelligent answers
 
 ## External Dependencies
 

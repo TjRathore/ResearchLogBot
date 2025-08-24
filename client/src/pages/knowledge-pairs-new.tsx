@@ -24,7 +24,6 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import KnowledgePairModal from "@/components/knowledge-pair-modal";
-import QualityMetrics from "@/components/quality-metrics";
 
 export default function KnowledgePairs() {
   const [selectedPair, setSelectedPair] = useState<any>(null);
@@ -334,25 +333,12 @@ export default function KnowledgePairs() {
                       {expandedPair === pair.id && (
                         <div className="mt-4">
                           <Separator className="mb-4" />
-                          
-                          {/* Solution */}
-                          <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-400 mb-6">
+                          <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-400">
                             <h4 className="font-medium text-green-800 mb-2 flex items-center gap-2">
                               <Check className="h-4 w-4" />
                               Accepted Solution:
                             </h4>
                             <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{pair.solution}</p>
-                          </div>
-
-                          {/* Quality Metrics */}
-                          <div className="mb-6">
-                            <QualityMetrics 
-                              pairId={pair.id}
-                              onMetricsUpdate={(metrics) => {
-                                // Optionally update the pair's confidence score in the UI
-                                console.log('Quality metrics updated:', metrics);
-                              }}
-                            />
                           </div>
                           
                           {/* Related Questions */}
