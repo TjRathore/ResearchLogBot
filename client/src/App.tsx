@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Sidebar from "@/components/sidebar";
 import Dashboard from "@/pages/dashboard";
-import KnowledgePairs from "@/pages/knowledge-pairs";
+import KnowledgePairsNew from "@/pages/knowledge-pairs-new";
 import Messages from "@/pages/messages";
 import Search from "@/pages/search";
 import Settings from "@/pages/settings";
@@ -15,7 +15,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
-      <Route path="/knowledge-pairs" component={KnowledgePairs} />
+      <Route path="/knowledge-pairs" component={KnowledgePairsNew} />
       <Route path="/messages" component={Messages} />
       <Route path="/search" component={Search} />
       <Route path="/settings" component={Settings} />

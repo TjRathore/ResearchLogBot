@@ -214,7 +214,12 @@ export class N8nStorage {
         validated: true,
         created_at: "2024-01-13T10:15:30Z",
         source_platform: "slack",
-        source_channel: "#engineering"
+        source_channel: "#engineering",
+        upvotes: 15,
+        downvotes: 2,
+        views: 127,
+        tags: ["react", "performance", "optimization", "memo"],
+        related_pairs: ["kp_1736782123464_yzab567"]
       },
       {
         id: "kp_1736782123457_def456",
@@ -224,7 +229,12 @@ export class N8nStorage {
         validated: true,
         created_at: "2024-01-13T09:30:45Z",
         source_platform: "telegram",
-        source_channel: "@devhelp"
+        source_channel: "@devhelp",
+        upvotes: 23,
+        downvotes: 1,
+        views: 189,
+        tags: ["javascript", "async", "promises", "error-handling"],
+        related_pairs: []
       },
       {
         id: "kp_1736782123458_ghi789",
@@ -234,7 +244,12 @@ export class N8nStorage {
         validated: false,
         created_at: "2024-01-13T08:45:22Z",
         source_platform: "slack",
-        source_channel: "#database"
+        source_channel: "#database",
+        upvotes: 8,
+        downvotes: 0,
+        views: 67,
+        tags: ["database", "performance", "sql", "indexing"],
+        related_pairs: []
       },
       {
         id: "kp_1736782123459_jkl012",
@@ -244,7 +259,12 @@ export class N8nStorage {
         validated: true,
         created_at: "2024-01-13T07:20:15Z",
         source_platform: "slack",
-        source_channel: "#devops"
+        source_channel: "#devops",
+        upvotes: 31,
+        downvotes: 3,
+        views: 245,
+        tags: ["docker", "devops", "production", "security"],
+        related_pairs: []
       },
       {
         id: "kp_1736782123460_mno345",
@@ -254,7 +274,12 @@ export class N8nStorage {
         validated: true,
         created_at: "2024-01-12T16:30:10Z",
         source_platform: "telegram",
-        source_channel: "@security"
+        source_channel: "@security",
+        upvotes: 19,
+        downvotes: 1,
+        views: 156,
+        tags: ["api", "security", "authentication", "rest"],
+        related_pairs: []
       },
       {
         id: "kp_1736782123461_pqr678",
@@ -264,7 +289,12 @@ export class N8nStorage {
         validated: false,
         created_at: "2024-01-12T15:45:33Z",
         source_platform: "slack",
-        source_channel: "#architecture"
+        source_channel: "#architecture",
+        upvotes: 12,
+        downvotes: 2,
+        views: 89,
+        tags: ["database", "sql", "nosql", "architecture"],
+        related_pairs: ["kp_1736782123458_ghi789"]
       },
       {
         id: "kp_1736782123462_stu901",
@@ -274,7 +304,12 @@ export class N8nStorage {
         validated: true,
         created_at: "2024-01-12T14:15:28Z",
         source_platform: "slack",
-        source_channel: "#frontend"
+        source_channel: "#frontend",
+        upvotes: 14,
+        downvotes: 0,
+        views: 98,
+        tags: ["websocket", "realtime", "frontend", "socket.io"],
+        related_pairs: []
       },
       {
         id: "kp_1736782123463_vwx234",
@@ -284,7 +319,12 @@ export class N8nStorage {
         validated: true,
         created_at: "2024-01-12T13:00:55Z",
         source_platform: "telegram",
-        source_channel: "@architecture"
+        source_channel: "@architecture",
+        upvotes: 27,
+        downvotes: 2,
+        views: 203,
+        tags: ["microservices", "architecture", "patterns", "distributed"],
+        related_pairs: []
       },
       {
         id: "kp_1736782123464_yzab567",
@@ -294,7 +334,12 @@ export class N8nStorage {
         validated: false,
         created_at: "2024-01-12T11:30:42Z",
         source_platform: "slack",
-        source_channel: "#react"
+        source_channel: "#react",
+        upvotes: 11,
+        downvotes: 1,
+        views: 76,
+        tags: ["react", "state-management", "redux", "zustand"],
+        related_pairs: ["kp_1736782123456_abc123"]
       }
     ];
   }
@@ -310,7 +355,86 @@ export class N8nStorage {
   }
 
   async updateKnowledgePair(id: string, updates: any): Promise<any> {
-    return await n8nService.updateKnowledgePair(id, updates);
+    try {
+      return await n8nService.updateKnowledgePair(id, updates);
+    } catch (error) {
+      // For dummy data, simulate the update
+      const dummyPairs = this.getDummyKnowledgePairs();
+      const pairIndex = dummyPairs.findIndex((pair: any) => pair.id === id);
+      
+      if (pairIndex !== -1) {
+        const updatedPair = { ...dummyPairs[pairIndex], ...updates };
+        console.log(`Updated knowledge pair ${id} with:`, updates);
+        return updatedPair;
+      }
+      
+      return null;
+    }
+  }
+
+  // New voting methods
+  async voteKnowledgePair(id: string, voteType: 'upvote' | 'downvote'): Promise<any> {
+    try {
+      // Try n8n first (would implement voting webhook)
+      return await n8nService.triggerWorkflow('vote-knowledge-pair', {
+        action: 'vote',
+        id,
+        voteType
+      });
+    } catch (error) {
+      // Simulate voting for dummy data
+      const dummyPairs = this.getDummyKnowledgePairs();
+      const pair = dummyPairs.find((p: any) => p.id === id);
+      
+      if (pair) {
+        if (voteType === 'upvote') {
+          pair.upvotes = (pair.upvotes || 0) + 1;
+        } else {
+          pair.downvotes = (pair.downvotes || 0) + 1;
+        }
+        
+        console.log(`${voteType} on knowledge pair ${id}`);
+        return pair;
+      }
+      
+      return null;
+    }
+  }
+
+  async getRelatedKnowledgePairs(id: string, limit: number = 5): Promise<any[]> {
+    try {
+      return await n8nService.triggerWorkflow('get-related-pairs', {
+        action: 'get_related',
+        id,
+        limit
+      });
+    } catch (error) {
+      // Get related pairs from dummy data
+      const dummyPairs = this.getDummyKnowledgePairs();
+      const currentPair = dummyPairs.find((p: any) => p.id === id);
+      
+      if (!currentPair) return [];
+      
+      const relatedIds = currentPair.related_pairs || [];
+      const relatedPairs = dummyPairs.filter((p: any) => 
+        relatedIds.includes(p.id) || 
+        (p.tags && currentPair.tags && p.tags.some((tag: string) => currentPair.tags.includes(tag)))
+      ).slice(0, limit);
+      
+      return relatedPairs;
+    }
+  }
+
+  async incrementViews(id: string): Promise<void> {
+    try {
+      await n8nService.triggerWorkflow('increment-views', {
+        action: 'increment_views',
+        id
+      });
+    } catch (error) {
+      // Simulate view increment for dummy data
+      console.log(`Incrementing views for knowledge pair ${id}`);
+    }
   }
 
   async validateKnowledgePair(id: string): Promise<any> {

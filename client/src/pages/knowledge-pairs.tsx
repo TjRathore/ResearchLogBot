@@ -1,12 +1,26 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Edit, Flag, Trash2, Check, Search } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { 
+  ArrowUp, 
+  ArrowDown, 
+  Eye, 
+  MessageSquare, 
+  Edit, 
+  Flag, 
+  Trash2, 
+  Check, 
+  Search,
+  ExternalLink,
+  Tag,
+  Calendar,
+  TrendingUp
+} from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import KnowledgePairModal from "@/components/knowledge-pair-modal";
@@ -16,12 +30,40 @@ export default function KnowledgePairs() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("votes"); // votes, newest, views
+  const [expandedPair, setExpandedPair] = useState<string | null>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: knowledgePairs, isLoading } = useQuery({
     queryKey: ["/api/knowledge-pairs"],
+  });
+
+  const voteMutation = useMutation({
+    mutationFn: async ({ id, voteType }: { id: string; voteType: 'upvote' | 'downvote' }) => {
+      return apiRequest("POST", `/api/knowledge-pairs/${id}/vote`, { voteType });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/knowledge-pairs"] });
+      toast({
+        title: "Success",
+        description: "Vote recorded successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to record vote",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const viewMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("POST", `/api/knowledge-pairs/${id}/view`);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -103,19 +145,44 @@ export default function KnowledgePairs() {
     flagMutation.mutate(id);
   };
 
-  const filteredPairs = (knowledgePairs as any[] || []).filter((pair: any) => {
-    const matchesSearch = 
+  const filteredAndSortedPairs = (knowledgePairs as any[] || []).filter((pair: any) => {
+    const matchesSearch = !searchTerm ||
       pair.problem.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      pair.solution.toLowerCase().includes(searchTerm.toLowerCase());
+      pair.solution.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      pair.tags?.some((tag: string) => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesStatus = 
       statusFilter === "all" ||
       (statusFilter === "validated" && pair.validated) ||
-      (statusFilter === "pending" && !pair.validated && pair.confidenceScore >= 0.7) ||
-      (statusFilter === "flagged" && pair.confidenceScore < 0.7);
+      (statusFilter === "pending" && !pair.validated && pair.confidence_score >= 0.7) ||
+      (statusFilter === "flagged" && pair.confidence_score < 0.7);
     
     return matchesSearch && matchesStatus;
+  }).sort((a: any, b: any) => {
+    switch (sortBy) {
+      case "votes":
+        return (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes);
+      case "newest":
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      case "views":
+        return b.views - a.views;
+      default:
+        return 0;
+    }
   }) || [];
+
+  const handleVote = (id: string, voteType: 'upvote' | 'downvote') => {
+    voteMutation.mutate({ id, voteType });
+  };
+
+  const handleViewPair = (id: string) => {
+    if (expandedPair !== id) {
+      viewMutation.mutate(id);
+      setExpandedPair(expandedPair === id ? null : id);
+    } else {
+      setExpandedPair(null);
+    }
+  };
 
   return (
     <div className="flex-1 overflow-y-auto">

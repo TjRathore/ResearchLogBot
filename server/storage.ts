@@ -37,6 +37,11 @@ export interface IStorage {
     pending: number;
     flagged: number;
   }>;
+  
+  // Voting functionality
+  voteKnowledgePair(id: string, voteType: 'upvote' | 'downvote'): Promise<any>;
+  getRelatedKnowledgePairs(id: string, limit?: number): Promise<any[]>;
+  incrementViews(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {

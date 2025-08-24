@@ -129,6 +129,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Voting endpoints
+  app.post("/api/knowledge-pairs/:id/vote", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { voteType } = req.body;
+      
+      if (!['upvote', 'downvote'].includes(voteType)) {
+        return res.status(400).json({ error: 'Invalid vote type. Must be "upvote" or "downvote"' });
+      }
+      
+      const result = await storage.voteKnowledgePair(id, voteType);
+      if (!result) {
+        return res.status(404).json({ error: 'Knowledge pair not found' });
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Failed to vote on knowledge pair:', error);
+      res.status(500).json({ error: 'Failed to vote on knowledge pair' });
+    }
+  });
+
+  // Related knowledge pairs endpoint
+  app.get("/api/knowledge-pairs/:id/related", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const limit = parseInt(req.query.limit as string) || 5;
+      
+      const relatedPairs = await storage.getRelatedKnowledgePairs(id, limit);
+      res.json(relatedPairs);
+    } catch (error) {
+      console.error('Failed to get related knowledge pairs:', error);
+      res.status(500).json({ error: 'Failed to get related knowledge pairs' });
+    }
+  });
+
+  // Increment views endpoint
+  app.post("/api/knowledge-pairs/:id/view", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.incrementViews(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Failed to increment views:', error);
+      res.status(500).json({ error: 'Failed to increment views' });
+    }
+  });
+
   // Search API
   app.post("/api/search", async (req, res) => {
     try {
