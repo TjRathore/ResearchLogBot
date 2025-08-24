@@ -5,6 +5,7 @@ import { n8nStorage as storage } from "./storage/n8n-storage";
 import { sendTelegramMessage, parseTelegramUpdate, type TelegramUpdate } from "./services/telegram";
 import { sendSlackMessage, parseSlackEvent, type SlackEvent } from "./services/slack";
 import { generateEmbedding, generateAnswer } from "./services/openai";
+import { qualityScorer, type QualityMetrics } from "./services/quality-scorer";
 import { insertMessageSchema, insertKnowledgePairSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -143,6 +144,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!result) {
         return res.status(404).json({ error: 'Knowledge pair not found' });
       }
+      
+      // Trigger quality score recalculation after vote
+      setTimeout(() => {
+        updateQualityScoreWithCommunityFeedback(id).catch(console.error);
+      }, 100);
       
       res.json(result);
     } catch (error) {
@@ -566,5 +572,52 @@ async function sendBotResponse(message: any, platform: 'telegram' | 'slack', tex
     }
   } catch (error) {
     console.error(`Failed to send ${platform} response:`, error);
+  }
+}
+
+// Helper function to update quality scores with community feedback
+async function updateQualityScoreWithCommunityFeedback(id: string) {
+  try {
+    const pair = await storage.getKnowledgePairById(id);
+    if (!pair) return;
+
+    let existingMetrics;
+    try {
+      existingMetrics = pair.quality_metrics ? JSON.parse(pair.quality_metrics) : null;
+    } catch (error) {
+      existingMetrics = null;
+    }
+
+    if (!existingMetrics) {
+      // If no existing metrics, calculate from scratch
+      const qualityMetrics = await qualityScorer.scoreKnowledgePair({
+        problem: pair.problem,
+        solution: pair.solution,
+        platform: pair.source_platform,
+        upvotes: pair.upvotes || 0,
+        downvotes: pair.downvotes || 0,
+        views: pair.views || 0
+      });
+
+      await storage.updateKnowledgePair(id, {
+        confidence_score: qualityMetrics.confidenceScore,
+        quality_metrics: JSON.stringify(qualityMetrics)
+      });
+    } else {
+      // Update existing metrics with new community feedback
+      const updatedMetrics = qualityScorer.updateWithCommunityFeedback(
+        existingMetrics,
+        pair.upvotes || 0,
+        pair.downvotes || 0,
+        pair.views || 0
+      );
+
+      await storage.updateKnowledgePair(id, {
+        confidence_score: updatedMetrics.confidenceScore,
+        quality_metrics: JSON.stringify(updatedMetrics)
+      });
+    }
+  } catch (error) {
+    console.error(`Failed to update quality score for ${id}:`, error);
   }
 }

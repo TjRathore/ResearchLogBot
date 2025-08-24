@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Sidebar from "@/components/sidebar";
 import Dashboard from "@/pages/dashboard";
 import KnowledgePairsNew from "@/pages/knowledge-pairs-new";
+import QualityDashboard from "@/pages/quality-dashboard";
 import Messages from "@/pages/messages";
 import Search from "@/pages/search";
 import Settings from "@/pages/settings";
@@ -16,6 +17,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/knowledge-pairs" component={KnowledgePairsNew} />
+      <Route path="/quality" component={QualityDashboard} />
       <Route path="/messages" component={Messages} />
       <Route path="/search" component={Search} />
       <Route path="/settings" component={Settings} />
